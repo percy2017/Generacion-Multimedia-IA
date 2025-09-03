@@ -1,0 +1,540 @@
+<!DOCTYPE html>
+<html lang="es" data-bs-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KipuxAI - Generador de Contenido Multimedia con IA</title>
+    <link rel="icon" href="/public/favicon.png">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet"
+        integrity="sha384-QWTKZyjpPEjISv5WaRU9OFeRpok6YctnYmDr5pNlyT2bRjXh0JMhjY6hW+ALEwIH" crossorigin="anonymous">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css"
+        integrity="sha512-z3gLpd7yknf1YoNbCzqRKc4qyor8gaKU1qmn+CShxbuBusANI9QpRohGBreCFkKxLhei6S9CQXFEbbKuqLg0DA=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.min.css">
+    <script>
+        const LITELLM_URL = "<%= user.url %>";
+        const LITELLM_API_KEY = "<%= user.key %>";
+        const TOOL_SCHEMAS = <%- JSON.stringify(TOOL_SCHEMAS) %>;
+        const USER_DATA = <%- JSON.stringify(user || {}) %>;
+    </script>
+
+    <style>
+        /* Ajustes de color para el tema oscuro */
+        [data-bs-theme="dark"] {
+            --bs-body-bg: #212529;
+            --bs-body-color: #f8f9fa;
+            --bs-card-bg: #343a40;
+            --bs-navbar-bg: #2b3035;
+        }
+
+        /* Ajustar colores del header/navbar */
+        .navbar-brand img {
+            width: 30px;
+            height: 30px;
+        }
+
+        .balance-pill {
+            background-color: rgba(255, 255, 255, 0.1);
+            color: #f8f9fa;
+            padding: 0.25rem 0.75rem;
+            border-radius: 1rem;
+            font-size: 0.875rem;
+        }
+
+        [data-bs-theme="light"] .balance-pill {
+            background-color: #e9ecef;
+            color: #212529;
+        }
+
+        /* Espaciado para el contenido principal debajo del navbar fijo */
+        main {
+            padding-top: 70px;
+            /* Ajustar según la altura del navbar */
+        }
+
+        /* Estilos para tabs */
+        .nav-tabs .nav-link {
+            font-weight: 500;
+        }
+
+        .nav-tabs .nav-link.active {
+            background-color: rgba(var(--bs-primary-rgb), 0.1);
+        }
+
+        /* Estilos para el área de resultado */
+        #image-result-wrapper {
+            min-height: 300px;
+            /* Altura mínima para el placeholder */
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background-color: #f8f9fa;
+            border-radius: 0.5rem;
+        }
+
+        [data-bs-theme="dark"] #image-result-wrapper {
+            background-color: #495057;
+        }
+
+        #image-result-wrapper img,
+        #image-result-wrapper video {
+            max-width: 100%;
+            max-height: 500px;
+            /* Limitar la altura */
+            border-radius: 0.5rem;
+        }
+
+        /* Estilos para la UI dinámica */
+        .dynamic-input-group {
+            margin-bottom: 1rem;
+        }
+
+        .dynamic-input-group label {
+            font-weight: 500;
+        }
+
+        /* Para sliders con valor mostrado */
+        .slider-value {
+            font-size: 0.875rem;
+            color: #6c757d;
+            margin-top: 0.25rem;
+        }
+
+        /* Estilos para galería */
+        .media-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .media-item {
+            border-radius: 0.5rem;
+            overflow: hidden;
+            position: relative;
+            aspect-ratio: 1/1;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+
+        .media-item:hover {
+            transform: scale(1.05);
+        }
+
+        .media-item img,
+        .media-item video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .media-item .media-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 0.5rem;
+            font-size: 0.8rem;
+            transform: translateY(100%);
+            transition: transform 0.2s;
+        }
+
+        .media-item:hover .media-overlay {
+            transform: translateY(0);
+        }
+
+        /* Estilos para perfil */
+        .budget-progress {
+            height: 1.5rem;
+            border-radius: 0.75rem;
+        }
+
+        .budget-progress .progress-bar {
+            transition: width 1s ease-in-out;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Navbar de Bootstrap -->
+    <nav class="navbar navbar-expand-lg fixed-top bg-body-tertiary">
+        <div class="container-fluid">
+            <a class="navbar-brand" href="#">
+                <img src="/public/favicon.png" alt="Logo"> KipuxAI
+            </a>
+
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav"
+                aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav me-auto">
+                    <!-- Espacio para navegación futura si se necesita -->
+                </ul>
+                <div class="d-flex align-items-center">
+                    <!-- Botón de Toggle para Tema -->
+                    <button id="theme-toggle" class="btn btn-sm btn-outline-secondary me-2" type="button"
+                        title="Cambiar tema">
+                        <span id="theme-icon">🌙</span>
+                    </button>
+
+                    <div class="me-3">
+                        <span class="me-2">
+                            <%= user.alias %>
+                        </span>
+                        <span class="balance-pill" id="user-balance">
+                            $<%= user.spend.toFixed(4) %> / $<%= user.budget ? user.budget.toFixed(2) : '∞' %>
+                        </span>
+                    </div>
+                    <a href="/logout" class="btn btn-outline-danger">Desconectar</a>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Contenido Principal -->
+    <main class="container-fluid mt-4">
+        <!-- Tabs de navegación -->
+        <ul class="nav nav-tabs mb-4" id="mainTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="generator-tab" data-bs-toggle="tab" data-bs-target="#generator"
+                    type="button" role="tab" aria-controls="generator" aria-selected="true">
+                    <i class="fas fa-wand-magic-sparkles me-1"></i> Generador
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="gallery-tab" data-bs-toggle="tab" data-bs-target="#gallery" type="button"
+                    role="tab" aria-controls="gallery" aria-selected="false">
+                    <i class="fas fa-images me-1"></i> Galería
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="models-tab" data-bs-toggle="tab" data-bs-target="#models" type="button"
+                    role="tab" aria-controls="models" aria-selected="false">
+                    <i class="fas fa-robot me-1"></i> Modelos
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="profile-tab" data-bs-toggle="tab" data-bs-target="#profile" type="button"
+                    role="tab" aria-controls="profile" aria-selected="false">
+                    <i class="fas fa-user me-1"></i> Perfil
+                </button>
+            </li>
+        </ul>
+
+        <!-- Contenido de los tabs -->
+        <div class="tab-content" id="mainTabsContent">
+            <!-- Tab Generador -->
+            <div class="tab-pane fade show active" id="generator" role="tabpanel" aria-labelledby="generator-tab">
+                <div class="row">
+                    <!-- Panel de Formulario (Columna Izquierda) -->
+                    <div class="col-lg-6">
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Generar Contenido IA</h5>
+                            </div>
+                            <div class="card-body">
+                                <!-- Selector de Herramienta/Esquema -->
+                                <div class="mb-3">
+                                    <label for="tool-selector" class="form-label">1. Elige una Herramienta</label>
+                                    <select id="tool-selector" class="form-select" required>
+                                        <option value="" disabled selected>Selecciona una herramienta...</option>
+                                        <% TOOL_SCHEMAS.forEach(tool=> { %>
+                                            <option value="<%= tool.id %>">
+                                                <%= tool.name %>
+                                            </option>
+                                            <% }); %>
+                                    </select>
+                                    <div id="tool-description" class="form-text text-muted mt-2"></div>
+                                </div>
+
+                                <!-- Formulario dinámico generado por schemas.js y main.js -->
+                                <form id="generation-form">
+                                    <div id="dynamic-ui-container">
+                                        <!-- Aquí se insertará la UI dinámica -->
+                                        <div class="text-center text-muted mt-5">
+                                            <p>Selecciona una herramienta para configurar las opciones.</p>
+                                        </div>
+                                    </div>
+                                    <button type="submit" id="generate-btn" class="btn btn-primary w-100 mt-3"
+                                        disabled>Generar</button>
+                                </form>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Panel de Resultado y Historial (Columna Derecha) -->
+                    <div class="col-lg-6">
+                        <!-- Panel de Resultado Inmediato -->
+                        <div class="card mb-4">
+                            <div class="card-header">
+                                <h5 class="mb-0">Resultado Inmediato</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="image-result-wrapper" class="text-center">
+                                    <p class="text-muted">La imagen o video recién generado aparecerá aquí.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Galería -->
+            <div class="tab-pane fade" id="gallery" role="tabpanel" aria-labelledby="gallery-tab">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Galería de Contenido Generado</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="media-gallery" class="media-grid">
+                            <!-- Los elementos de la galería se cargarán aquí dinámicamente -->
+                            <div class="text-center text-muted mt-5 w-100">
+                                <p>No se han encontrado elementos en la galería.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+
+            <!-- Tab Perfil (Diseño SIN AVATAR) -->
+            <div class="tab-pane fade" id="profile" role="tabpanel" aria-labelledby="profile-tab">
+                <div class="row justify-content-center" id="profile-tab-content">
+                    <div class="col-lg-12">
+                        <div class="card shadow-sm">
+
+                            <!-- ENCABEZADO DE LA TARJETA (REEMPLAZA AL AVATAR) -->
+                            <div
+                                class="card-header bg-body-tertiary d-flex justify-content-between align-items-center p-3">
+                                <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i>Perfil de Usuario</h5>
+                                <span class="fw-bold" id="profile-alias-header"></span>
+                            </div>
+
+                            <div class="card-body">
+                                <div class="row">
+
+                                    <!-- COLUMNA IZQUIERDA: Resumen de Presupuesto -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h6 class="mb-0 fw-bold"><i class="fas fa-wallet me-2"></i>Resumen de
+                                                    Presupuesto</h6>
+                                            </div>
+                                            <div class="card-body d-flex flex-column justify-content-center">
+                                                <div class="row mb-3">
+                                                    <div class="col-6">
+                                                        <label class="form-label text-muted">Gasto Actual</label>
+                                                        <h4 class="fw-bold" id="profile-spend"></h4>
+                                                    </div>
+                                                    <div class="col-6 text-end">
+                                                        <label class="form-label text-muted">Presupuesto Máximo</label>
+                                                        <h4 class="fw-bold" id="profile-max-budget"></h4>
+                                                    </div>
+                                                </div>
+                                                <div class="d-flex justify-content-between align-items-center mb-1">
+                                                    <span class="text-muted small">Uso del Presupuesto</span>
+                                                    <span class="fw-bold" id="profile-budget-percent"></span>
+                                                </div>
+                                                <div class="progress" style="height: 1rem;">
+                                                    <div id="profile-budget-progress" class="progress-bar"
+                                                        role="progressbar"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- COLUMNA DERECHA: Detalles de la Cuenta -->
+                                    <div class="col-md-6">
+                                        <div class="card h-100">
+                                            <div class="card-header">
+                                                <h6 class="mb-0 fw-bold"><i class="fas fa-info-circle me-2"></i>Detalles
+                                                    de la Cuenta</h6>
+                                            </div>
+                                            <div class="card-body p-0">
+                                                <ul class="list-group list-group-flush">
+                                                    <li
+                                                        class="list-group-item d-flex justify-content-between align-items-center">
+                                                        <div><i
+                                                                class="fas fa-user-tag fa-fw me-2 text-muted"></i>Nombre/Alias
+                                                        </div>
+                                                        <span class="fw-bold text-end" id="profile-key-alias"></span>
+                                                    </li>
+                                                    <li
+                                                        class="list-group-item d-flex justify-content-between align-items-center">
+                                                        <div><i class="fas fa-key fa-fw me-2 text-muted"></i>Key Name
+                                                        </div>
+                                                        <span class="fw-bold font-monospace text-end"
+                                                            id="profile-key-name"></span>
+                                                    </li>
+                                                    <li
+                                                        class="list-group-item d-flex justify-content-between align-items-center">
+                                                        <div><i class="fas fa-id-card fa-fw me-2 text-muted"></i>ID de
+                                                            Usuario</div>
+                                                        <span class="fw-bold text-end" id="profile-user-id"></span>
+                                                    </li>
+                                                    <li
+                                                        class="list-group-item d-flex justify-content-between align-items-center">
+                                                        <div><i
+                                                                class="fas fa-calendar-plus fa-fw me-2 text-muted"></i>Fecha
+                                                            de Creación</div>
+                                                        <span class="fw-bold text-end" id="profile-created-at"></span>
+                                                    </li>
+                                                    <li
+                                                        class="list-group-item d-flex justify-content-between align-items-center">
+                                                        <div><i class="fas fa-cubes fa-fw me-2 text-muted"></i>Modelos
+                                                            Permitidos</div>
+                                                        <span class="fw-bold text-end" id="profile-models"></span>
+                                                    </li>
+                                                </ul>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Modelos y Herramientas -->
+            <div class="tab-pane fade" id="models" role="tabpanel" aria-labelledby="models-tab">
+                <div class="row justify-content-center">
+                    <div class="col-12">
+                        <div class="card">
+                            <div class="card-header">
+                                <h5 class="mb-0">Modelos LLM y Herramientas</h5>
+                            </div>
+                            <div class="card-body">
+                                <div id="llm-models-container" class="row">
+                                    <!-- Los modelos LLM se cargarán aquí dinámicamente -->
+                                    <div class="col-12">
+                                        <div class="text-center text-muted mt-3">
+                                            <p>Cargando modelos disponibles...</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Modal de Detalle de Bootstrap -->
+    <div class="modal fade" id="imageDetailModal" tabindex="-1" aria-labelledby="imageDetailModalLabel"
+        aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h1 class="modal-title fs-5" id="imageDetailModalLabel">Detalles de la Generación</h1>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="text-center mb-3">
+                                <img id="modal-image" src="" class="img-fluid rounded" alt="Imagen detallada">
+                                <video id="modal-video" src="" class="img-fluid rounded" style="display:none;"
+                                    controls></video>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="modal-metadata">
+                                <div class="mb-3">
+                                    <strong>Prompt:</strong>
+                                    <p id="modal-prompt" class="mb-1"></p>
+                                    <button id="copy-prompt-btn" class="btn btn-sm btn-outline-secondary">
+                                        <i class="fas fa-copy"></i> Copiar Prompt
+                                    </button>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Herramienta Usada:</strong> <span id="modal-model"></span>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Fecha:</strong> <span id="modal-date"></span>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Costo:</strong> <span id="modal-cost"></span>
+                                </div>
+                                <a id="download-link" href="#" download class="btn btn-success mt-2">
+                                    <i class="fas fa-download"></i> Descargar
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"
+        integrity="sha384-YvpcrYf0tY3lHB60NNkmXc5s9fDVZLESaAA55NDzOxhy9GkcIdslK1eN7N6jIeHz"
+        crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11/dist/sweetalert2.all.min.js"></script>
+    <script src="/public/js/main.js" type="module"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const toggleButton = document.getElementById('theme-toggle');
+            const themeIcon = document.getElementById('theme-icon');
+            const htmlElement = document.documentElement;
+            function setTheme(theme) {
+                htmlElement.setAttribute('data-bs-theme', theme);
+                localStorage.setItem('theme', theme);
+                // Actualizar el icono del botón
+                themeIcon.textContent = theme === 'dark' ? '☀️' : '🌙';
+            }
+
+            // Cargar tema preferido al iniciar
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+
+            if (savedTheme) {
+                setTheme(savedTheme);
+            } else if (systemPrefersDark) {
+                setTheme('dark');
+            } else {
+                setTheme('light');
+            }
+
+            // Evento para el botón de toggle
+            toggleButton.addEventListener('click', () => {
+                const currentTheme = htmlElement.getAttribute('data-bs-theme');
+                const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                setTheme(newTheme);
+            });
+
+            // Calcular y mostrar porcentaje de uso del presupuesto
+            const spend = "<%= user.spend %>";
+            const budget = "<%= user.budget ?user.budget: 'null' %>";
+            if (budget) {
+                const percent = (spend / budget) * 100;
+                document.getElementById('profile-budget-percent').textContent = percent.toFixed(2) + '%';
+                document.getElementById('profile-budget-progress').style.width = Math.min(percent, 100) + '%';
+
+                document.getElementById('profile-key-alias').innerHTML = "<%= user.alias %>";
+                document.getElementById('profile-key-name').innerHTML = "<%= user.keyName %>";
+                // Colorear la barra de progreso según el porcentaje
+                if (percent < 50) {
+                    document.getElementById('profile-budget-progress').classList.add('bg-success');
+                } else if (percent < 80) {
+                    document.getElementById('profile-budget-progress').classList.add('bg-warning');
+                } else {
+                    document.getElementById('profile-budget-progress').classList.add('bg-danger');
+                }
+            } else {
+                document.getElementById('profile-budget-percent').textContent = 'Sin límite';
+                document.getElementById('profile-budget-progress').style.width = '100%';
+                document.getElementById('profile-budget-progress').classList.add('bg-info');
+            }
+
+
+        });
+    </script>
+</body>
+
+</html>

@@ -1,0 +1,9 @@
+# === Dependencias ===
+node_modules/
+public/media/
+logs/
+
+# === Archivos de Entorno ===
+.env
+env.*
+QWEN.md
