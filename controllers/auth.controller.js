@@ -2,6 +2,12 @@ import logger from '../logger.js';
 
 // Renderizar página de login
 export const showLoginPage = (req, res) => {
+  logger.debug("Mostrando página de login", {
+    hasSession: !!req.session,
+    hasUser: !!(req.session && req.session.user),
+    sessionId: req.session ? req.session.id : null
+  });
+  
   res.render("login", { error: null });
 };
 
@@ -75,7 +81,18 @@ export const processLogin = async (req, res) => {
       budget: req.session.user.budget,
     });
 
-    res.redirect("/app");
+    // Ensure session is saved before redirecting
+    req.session.save((err) => {
+      if (err) {
+        logger.error("Error al guardar la sesión:", err);
+        return res.status(500).render("login", {
+          error: "Error interno del servidor. Por favor, inténtalo de nuevo."
+        });
+      }
+      
+      logger.debug("Sesión guardada correctamente, redirigiendo a /app");
+      res.redirect("/app");
+    });
   } catch (error) {
     logger.error("Fallo en el login:", { error: error.message });
     res.render("login", {
@@ -96,6 +113,15 @@ export const logout = (req, res) => {
 
 // Mostrar aplicación principal
 export const showMainApp = (req, res) => {
+  logger.debug("Mostrando aplicación principal", {
+    hasSession: !!req.session,
+    hasUser: !!(req.session && req.session.user),
+    user: req.session && req.session.user ? {
+      alias: req.session.user.alias,
+      key: req.session.user.key ? req.session.user.key.substring(0, 8) + "..." : null
+    } : null
+  });
+  
   // Importar los esquemas de herramientas
   import('../public/schemas.js').then(({ TOOL_SCHEMAS }) => {
     res.render("main", {

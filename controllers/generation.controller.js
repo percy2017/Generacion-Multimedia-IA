@@ -103,6 +103,23 @@ export const generateContent = async (req, res) => {
             width = parseInt(dimensions[0]);
             height = parseInt(dimensions[1]);
           }
+        } else if (inputs.aspect_ratio) {
+          // Convert aspect ratio to dimensions (default to 1024x1024 for square)
+          switch (inputs.aspect_ratio) {
+            case "Paisaje":
+              width = 1216;
+              height = 832;
+              break;
+            case "Retrato":
+              width = 832;
+              height = 1216;
+              break;
+            case "Cuadrado":
+            default:
+              width = 1024;
+              height = 1024;
+              break;
+          }
         }
 
         const pixels = width * height;
@@ -189,6 +206,66 @@ export const generateContent = async (req, res) => {
       Object.assign(target, tool.request_config.payload_structure.__fixed);
     }
 
+    // Special handling for Google Gemini to support image editing
+    if (tool.provider === "google" && inputs.image) {
+      // When editing an image, we need to modify the contents structure
+      if (!payload.contents) {
+        payload.contents = [
+          {
+            "role": "user",
+            "parts": []
+          }
+        ];
+      }
+      
+      // Add the text prompt as the first part
+      if (inputs.prompt) {
+        payload.contents[0].parts.push({
+          "text": inputs.prompt
+        });
+      }
+      
+      // Add the image as the second part
+      // The image input is already processed by the general input handling
+      // We just need to make sure it's in the right format for Gemini
+    } else if (tool.provider === "google" && inputs.prompt) {
+      // For text-to-image generation with Google Gemini
+      if (!payload.contents) {
+        payload.contents = [
+          {
+            "role": "user",
+            "parts": []
+          }
+        ];
+      }
+      
+      // Add the text prompt
+      payload.contents[0].parts = [
+        {
+          "text": inputs.prompt
+        }
+      ];
+    }
+    
+    // Handle Google Gemini specific parameters
+    if (tool.provider === "google") {
+      // Set temperature if provided
+      if (inputs.temperature !== undefined) {
+        if (!payload.generationConfig) {
+          payload.generationConfig = {};
+        }
+        payload.generationConfig.temperature = parseFloat(inputs.temperature);
+      }
+      
+      // Set maxOutputTokens if provided
+      if (inputs.max_output_tokens !== undefined) {
+        if (!payload.generationConfig) {
+          payload.generationConfig = {};
+        }
+        payload.generationConfig.maxOutputTokens = parseInt(inputs.max_output_tokens);
+      }
+    }
+
     // Map user inputs
     const paramMapping = tool.request_config.payload_structure.param_mapping;
     for (const [inputName, paramName] of Object.entries(paramMapping)) {
@@ -197,44 +274,156 @@ export const generateContent = async (req, res) => {
       if (inputs[inputName] !== undefined) {
         // Handle file uploads for image editing tools
         if (
-          inputName === "image" &&
-          typeof inputs[inputName] === "object" &&
-          inputs[inputName].constructor.name === "File"
+          inputName === "image"
         ) {
-          // This is a file upload, save it to media directory and use the URL
-          try {
-            const file = inputs[inputName];
-            const timestamp = Date.now();
-            const keyName = req.session.user.key;
-            const fileNumber = timestamp.toString().slice(-5);
-            const fileExtension = path.extname(file.name) || ".png";
-            const filename = `${keyName}_${fileNumber}${fileExtension}`;
-            const filePath = path.join(__dirname, "..", "public", "media", filename);
+          // Special handling for Google Gemini
+          if (tool.provider === "google") {
+            // For Google Gemini, we need to convert the image to inlineData format
+            let imageData = null;
+            let mimeType = "image/jpeg"; // default
+            
+            // Check if it's a file upload object
+            if (
+              typeof inputs[inputName] === "object" &&
+              inputs[inputName].constructor.name === "File"
+            ) {
+              // This is a file upload, save it to media directory and convert to base64
+              try {
+                const file = inputs[inputName];
+                mimeType = file.type || "image/jpeg";
+                
+                // Convert file to base64
+                const buffer = Buffer.from(await file.arrayBuffer());
+                imageData = buffer.toString('base64');
+                
+                logger.debug("Imagen convertida a base64 para Gemini", {
+                  fileSize: buffer.length,
+                  mimeType: mimeType
+                });
+              } catch (fileError) {
+                logger.error("Error al procesar imagen para Gemini", {
+                  error: fileError.message,
+                });
+                throw new Error("No se pudo procesar la imagen para Gemini");
+              }
+            } else {
+              // It's a URL or base64 string
+              const inputValue = inputs[inputName];
+              if (inputValue.startsWith('data:')) {
+                // It's already base64 data URL
+                const parts = inputValue.split(',');
+                if (parts.length === 2) {
+                  imageData = parts[1];
+                  mimeType = inputValue.substring(5, inputValue.indexOf(';'));
+                }
+              } else if (inputValue.startsWith('http')) {
+                // It's a URL, we need to download and convert to base64
+                try {
+                  const response = await fetch(inputValue);
+                  if (response.ok) {
+                    const buffer = await response.arrayBuffer();
+                    imageData = Buffer.from(buffer).toString('base64');
+                    mimeType = response.headers.get('content-type') || "image/jpeg";
+                    logger.debug("Imagen de URL convertida a base64 para Gemini", {
+                      url: inputValue,
+                      mimeType: mimeType
+                    });
+                  }
+                } catch (fetchError) {
+                  logger.error("Error al descargar imagen desde URL", {
+                    error: fetchError.message,
+                    url: inputValue
+                  });
+                  throw new Error("No se pudo descargar la imagen desde la URL proporcionada");
+                }
+              } else {
+                // Assume it's already base64
+                imageData = inputValue;
+              }
+            }
+            
+            // Add the image data to the payload in Gemini format
+            if (imageData) {
+              // Ensure we have the correct structure for Gemini
+              if (!payload.contents) {
+                payload.contents = [{ role: "user", parts: [] }];
+              }
+              
+              // Add the image as inlineData
+              payload.contents[0].parts.push({
+                inlineData: {
+                  mimeType: mimeType,
+                  data: imageData
+                }
+              });
+              
+              logger.debug("Imagen añadida al payload de Gemini", {
+                mimeType: mimeType,
+                dataLength: imageData.length
+              });
+            }
+          } else {
+            // Handle other providers (existing logic)
+            // Check if it's a file upload object
+            if (
+              typeof inputs[inputName] === "object" &&
+              inputs[inputName].constructor.name === "File"
+            ) {
+              // This is a file upload, save it to media directory and use the URL
+              try {
+                const file = inputs[inputName];
+                const timestamp = Date.now();
+                const keyName = req.session.user.key;
+                const fileNumber = timestamp.toString().slice(-5);
+                const fileExtension = path.extname(file.name) || ".png";
+                const filename = `${keyName}_${fileNumber}${fileExtension}`;
+                const filePath = path.join(__dirname, "..", "public", "media", filename);
 
-            // Save file to disk
-            const buffer = Buffer.from(await file.arrayBuffer());
-            await fs.writeFile(filePath, buffer);
+                // Save file to disk
+                const buffer = Buffer.from(await file.arrayBuffer());
+                await fs.writeFile(filePath, buffer);
 
-            // Create public URL
-            const publicUrl = `${req.protocol}://${req.get(
-              "host"
-            )}/public/media/${filename}`;
-            target[paramName] = publicUrl;
+                // Create public URL
+                const publicUrl = `${req.protocol}://${req.get(
+                  "host"
+                )}/public/media/${filename}`;
+                target[paramName] = publicUrl;
 
-            logger.debug("Imagen subida guardada", {
-              filename: filename,
-              publicUrl: publicUrl,
-              fileSize: buffer.length,
-            });
-          } catch (fileError) {
-            logger.error("Error al guardar imagen subida", {
-              error: fileError.message,
-            });
-            throw new Error("No se pudo procesar la imagen subida");
+                logger.debug("Imagen subida guardada", {
+                  filename: filename,
+                  publicUrl: publicUrl,
+                  fileSize: buffer.length,
+                });
+              } catch (fileError) {
+                logger.error("Error al guardar imagen subida", {
+                  error: fileError.message,
+                });
+                throw new Error("No se pudo procesar la imagen subida");
+              }
+            } else {
+              // It's a URL or base64 string, use it directly
+              target[paramName] = inputs[inputName];
+              logger.debug("URL de imagen proporcionada directamente", {
+                imageUrl: inputs[inputName].substring(0, 100) + "...",
+              });
+            }
           }
         } else {
           // Handle type conversion for regular inputs
           let value = inputs[inputName];
+          
+          // Special handling for prompt to clean it up
+          if (inputName === "prompt" || inputName === "negative_prompt") {
+            // Convert to string and remove any leading/trailing quotes and numbers
+            value = String(value);
+            // Remove leading numbers and quotes
+            value = value.replace(/^\s*\d*\s*["']?(.*?)["']?\s*$/, '$1').trim();
+            // Remove extra whitespace and newlines
+            value = value.replace(/\s+/g, ' ').trim();
+            // Remove any remaining numbered list markers
+            value = value.replace(/^\d+\s*[-.]?\s*/g, '').trim();
+          }
+          
           if (
             tool.request_config.payload_structure.type_handling &&
             tool.request_config.payload_structure.type_handling[inputName]
@@ -282,6 +471,9 @@ export const generateContent = async (req, res) => {
         case "openai":
           apiKey = process.env.OPENAI_API_KEY || "";
           break;
+        case "google":
+          apiKey = process.env.GEMINI_API_KEY || "";
+          break;
         default:
           apiKey = process.env.DEFAULT_API_KEY || "";
       }
@@ -290,13 +482,23 @@ export const generateContent = async (req, res) => {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${apiKey}`,
         },
         body: JSON.stringify(payload),
       };
 
-      // Special handling for OpenAI
+      // Special handling for different providers
       if (tool.provider === "openai") {
+        fetchOptions.headers["Authorization"] = `Bearer ${apiKey}`;
+        // OpenAI also requires this header
+        fetchOptions.headers["OpenAI-Organization"] = process.env.OPENAI_ORG_ID || "";
+      } else if (tool.provider === "runpod") {
+        fetchOptions.headers["Authorization"] = `Bearer ${apiKey}`;
+      } else if (tool.provider === "google") {
+        // Google Gemini API uses query parameter for API key
+        const url = new URL(tool.api_endpoint);
+        url.searchParams.append('key', apiKey);
+        tool.api_endpoint = url.toString();
+      } else {
         fetchOptions.headers["Authorization"] = `Bearer ${apiKey}`;
       }
 
@@ -367,6 +569,9 @@ export const generateContent = async (req, res) => {
     // Extract media URL from response based on tool configuration
     let mediaUrl = null;
     let mediaType = "image";
+    let isBase64Data = false;
+    let base64Data = null;
+    let mimeType = null;
 
     if (tool.response_config.image_url_path) {
       // Navigate through the response object using dot notation
@@ -391,7 +596,17 @@ export const generateContent = async (req, res) => {
           break;
         }
       }
-      mediaUrl = current;
+      
+      // Check if this is base64 data (for Google Gemini)
+      if (current && current.data && current.mimeType) {
+        // This is base64 data from Google Gemini
+        isBase64Data = true;
+        base64Data = current.data;
+        mimeType = current.mimeType;
+        mediaUrl = "data:" + mimeType + ";base64," + base64Data;
+      } else {
+        mediaUrl = current;
+      }
 
       logger.debug("URL de imagen extraída", {
         path: tool.response_config.image_url_path,
@@ -466,28 +681,45 @@ export const generateContent = async (req, res) => {
       const filename = `${keyName}_${fileNumber}${fileExtension}`;
       const filePath = path.join(__dirname, "..", "public", "media", filename);
 
-      logger.debug("Descargando contenido generado", {
-        mediaUrl: mediaUrl.substring(0, 100) + "...",
-        localFilename: filename,
-      });
+      let mediaBuffer;
+      
+      if (isBase64Data) {
+        // Handle base64 data directly (for Google Gemini)
+        logger.debug("Procesando datos base64 de Gemini", {
+          mimeType: mimeType,
+          dataLength: base64Data.length
+        });
+        mediaBuffer = Buffer.from(base64Data, 'base64');
+      } else {
+        // Download the media file from URL
+        logger.debug("Descargando contenido generado", {
+          mediaUrl: mediaUrl.substring(0, 100) + "...",
+          localFilename: filename,
+        });
 
-      // Download the media file
-      const mediaResponse = await fetch(mediaUrl);
-      logger.debug("Respuesta de descarga", {
-        status: mediaResponse.status,
-        statusText: mediaResponse.statusText,
-        headers: Object.fromEntries(mediaResponse.headers.entries()),
-      });
+        const mediaResponse = await fetch(mediaUrl);
+        logger.debug("Respuesta de descarga", {
+          status: mediaResponse.status,
+          statusText: mediaResponse.statusText,
+          headers: Object.fromEntries(mediaResponse.headers.entries()),
+        });
 
-      if (!mediaResponse.ok) {
-        throw new Error(
-          `Failed to download media: ${mediaResponse.status} ${mediaResponse.statusText}`
-        );
+        if (!mediaResponse.ok) {
+          throw new Error(
+            `Failed to download media: ${mediaResponse.status} ${mediaResponse.statusText}`
+          );
+        }
+
+        // Save the file
+        mediaBuffer = await mediaResponse.arrayBuffer();
       }
+      
+      await fs.writeFile(filePath, mediaBuffer);
 
-      // Save the file
-      const mediaBuffer = await mediaResponse.arrayBuffer();
-      await fs.writeFile(filePath, Buffer.from(mediaBuffer));
+      logger.info("Contenido guardado localmente", {
+        localPath: filePath,
+        fileSize: mediaBuffer.byteLength,
+      });
 
       logger.info("Contenido guardado localmente", {
         localPath: filePath,
