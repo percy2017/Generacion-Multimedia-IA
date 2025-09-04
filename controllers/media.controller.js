@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../logger.js';
+import { getGenerationMetadata } from './metadata.controller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -65,20 +66,27 @@ export const getMediaFiles = async (req, res) => {
           if (keyName === req.session.user.key) {
             const fileUrl = `/public/media/${file}`;
             const timestamp = stats.birthtime.getTime();
-
+            
+            // Obtener metadatos de generación si existen
+            const metadata = await getGenerationMetadata(file);
+            
             mediaFiles.push({
               name: file,
               url: fileUrl,
-              timestamp: timestamp,
+              timestamp: metadata ? metadata.timestamp : timestamp,
               size: stats.size,
               keyName: keyName,
               fileNumber: fileNumber,
+              prompt: metadata ? metadata.prompt : null,
+              toolName: metadata ? metadata.toolName : null,
+              cost: metadata ? metadata.cost : null
             });
 
             logger.debug("Archivo de medio agregado", {
               filename: file,
               userId: keyName.substring(0, 8) + "...",
               size: stats.size,
+              hasMetadata: !!metadata
             });
           } else {
             logger.debug("Archivo omitido (no pertenece al usuario)", {

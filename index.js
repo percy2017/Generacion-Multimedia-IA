@@ -14,6 +14,7 @@ import logger from "./logger.js";
 import authRoutes from './routes/auth.routes.js';
 import mediaRoutes from './routes/media.routes.js';
 import generationRoutes from './routes/generation.routes.js';
+import statsRoutes from './routes/stats.routes.js';
 
 // --- CONFIGURACIÓN Y SETUP INICIAL ---
 const PORT = process.env.PORT || 3000;
@@ -48,8 +49,9 @@ app.use(
 
 // --- RUTAS ---
 app.use('/', authRoutes);
-app.use('/', mediaRoutes);
-app.use('/', generationRoutes);
+app.use('/api', mediaRoutes);
+app.use('/api', generationRoutes);
+app.use('/api', statsRoutes);
 
 async function startServer() {
   try {

@@ -46,22 +46,39 @@ export const processLogin = async (req, res) => {
 
     const keyInfo = await keyInfoRes.json();
 
+    logger.debug("Información del usuario obtenida de LiteLLM - RESPUESTA COMPLETA", {
+      keyInfo: keyInfo
+    });
+
+    // Extraer datos correctamente de la estructura de LiteLLM
+    const alias = keyInfo.info?.key_alias || keyInfo.info?.alias || "Usuario";
+    const spend = keyInfo.info?.spend || 0;
+    const budget = keyInfo.info?.max_budget;
+    const createdAt = keyInfo.info?.created_at || "";
+    const userId = keyInfo.info?.user_id || "";
+    const keyName = keyInfo.info?.key_name || "";
+    const models = keyInfo.info?.models || [];
+
     logger.debug("Información del usuario obtenida de LiteLLM", {
-      alias: keyInfo.info.alias || "Usuario",
-      spend: keyInfo.info.spend,
-      budget: keyInfo.info.max_budget,
+      alias: alias,
+      spend: spend,
+      budget: budget,
+      createdAt: createdAt,
+      userId: userId,
+      keyName: keyName,
+      models: models
     });
 
     req.session.user = {
       key: litellm_key,
       url: litellm_url,
-      alias: keyInfo.info.key_alias,
-      spend: keyInfo.info.spend,
-      budget: keyInfo.info.max_budget,
-      keyName: keyInfo.key_name,
-      userId: keyInfo.user_id,
-      createdAt: keyInfo.created_at,
-      models: keyInfo.models || [],
+      alias: alias,
+      spend: spend,
+      budget: budget,
+      keyName: keyName,
+      userId: userId,
+      createdAt: createdAt,
+      models: models,
     };
 
     // Configurar la duración de la sesión según la opción "Recuérdame"
@@ -118,7 +135,10 @@ export const showMainApp = (req, res) => {
     hasUser: !!(req.session && req.session.user),
     user: req.session && req.session.user ? {
       alias: req.session.user.alias,
-      key: req.session.user.key ? req.session.user.key.substring(0, 8) + "..." : null
+      key: req.session.user.key ? req.session.user.key.substring(0, 8) + "..." : null,
+      createdAt: req.session.user.createdAt,
+      userId: req.session.user.userId,
+      models: req.session.user.models
     } : null
   });
   

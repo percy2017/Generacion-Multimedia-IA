@@ -5,6 +5,6 @@ import { isAuthenticatedApi } from '../middleware/auth.middleware.js';
 const router = express.Router();
 
 // Ruta para obtener archivos de medios
-router.get('/api/media', isAuthenticatedApi, getMediaFiles);
+router.get('/media', isAuthenticatedApi, getMediaFiles);
 
 export default router;

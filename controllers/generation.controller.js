@@ -2,6 +2,7 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import logger from '../logger.js';
+import { saveGenerationMetadata } from './metadata.controller.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -721,10 +722,18 @@ export const generateContent = async (req, res) => {
         fileSize: mediaBuffer.byteLength,
       });
 
-      logger.info("Contenido guardado localmente", {
-        localPath: filePath,
-        fileSize: mediaBuffer.byteLength,
-      });
+      // Crear y guardar metadatos de generación
+      const generationMetadata = {
+        filename: filename,
+        toolId: tool.id,
+        toolName: tool.name,
+        prompt: inputs.prompt,
+        timestamp: timestamp,
+        cost: generationCost,
+        userId: req.session.user.key
+      };
+      
+      await saveGenerationMetadata(filename, generationMetadata);
 
       // Create local URL for the saved media
       const localMediaUrl = `/public/media/${filename}`;

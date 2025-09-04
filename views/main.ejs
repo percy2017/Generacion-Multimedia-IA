@@ -311,7 +311,7 @@
                             <div
                                 class="card-header bg-body-tertiary d-flex justify-content-between align-items-center p-3">
                                 <h5 class="mb-0"><i class="fas fa-user-circle me-2"></i>Perfil de Usuario</h5>
-                                <span class="fw-bold" id="profile-alias-header"></span>
+                                <span class="fw-bold" id="profile-alias-header"><%= user.alias %></span>
                             </div>
 
                             <div class="card-body">
@@ -328,20 +328,28 @@
                                                 <div class="row mb-3">
                                                     <div class="col-6">
                                                         <label class="form-label text-muted">Gasto Actual</label>
-                                                        <h4 class="fw-bold" id="profile-spend"></h4>
+                                                        <h4 class="fw-bold" id="profile-spend">$<%= user.spend.toFixed(4) %></h4>
                                                     </div>
                                                     <div class="col-6 text-end">
                                                         <label class="form-label text-muted">Presupuesto Máximo</label>
-                                                        <h4 class="fw-bold" id="profile-max-budget"></h4>
+                                                        <h4 class="fw-bold" id="profile-max-budget">$<%= user.budget ? user.budget.toFixed(2) : '∞' %></h4>
                                                     </div>
                                                 </div>
                                                 <div class="d-flex justify-content-between align-items-center mb-1">
                                                     <span class="text-muted small">Uso del Presupuesto</span>
-                                                    <span class="fw-bold" id="profile-budget-percent"></span>
+                                                    <span class="fw-bold" id="profile-budget-percent">
+                                                        <% if (user.budget) { %>
+                                                            <%= ((user.spend / user.budget) * 100).toFixed(2) %>%
+                                                        <% } else { %>
+                                                            Sin límite
+                                                        <% } %>
+                                                    </span>
                                                 </div>
                                                 <div class="progress" style="height: 1rem;">
                                                     <div id="profile-budget-progress" class="progress-bar"
-                                                        role="progressbar"></div>
+                                                        role="progressbar" 
+                                                        style="width: <% if (user.budget) { %><%= Math.min((user.spend / user.budget) * 100, 100) %>%<% } else { %>100%<% } %>;">
+                                                    </div>
                                                 </div>
                                             </div>
                                         </div>
@@ -361,33 +369,45 @@
                                                         <div><i
                                                                 class="fas fa-user-tag fa-fw me-2 text-muted"></i>Nombre/Alias
                                                         </div>
-                                                        <span class="fw-bold text-end" id="profile-key-alias"></span>
+                                                        <span class="fw-bold text-end" id="profile-key-alias"><%= user.alias %></span>
                                                     </li>
                                                     <li
                                                         class="list-group-item d-flex justify-content-between align-items-center">
                                                         <div><i class="fas fa-key fa-fw me-2 text-muted"></i>Key Name
                                                         </div>
                                                         <span class="fw-bold font-monospace text-end"
-                                                            id="profile-key-name"></span>
+                                                            id="profile-key-name"><%= user.keyName %></span>
                                                     </li>
                                                     <li
                                                         class="list-group-item d-flex justify-content-between align-items-center">
                                                         <div><i class="fas fa-id-card fa-fw me-2 text-muted"></i>ID de
                                                             Usuario</div>
-                                                        <span class="fw-bold text-end" id="profile-user-id"></span>
+                                                        <span class="fw-bold text-end" id="profile-user-id">
+                                                            <% if (user.userId) { %>
+                                                                <%= user.userId %>
+                                                            <% } else { %>
+                                                                No disponible
+                                                            <% } %>
+                                                        </span>
                                                     </li>
                                                     <li
                                                         class="list-group-item d-flex justify-content-between align-items-center">
                                                         <div><i
                                                                 class="fas fa-calendar-plus fa-fw me-2 text-muted"></i>Fecha
                                                             de Creación</div>
-                                                        <span class="fw-bold text-end" id="profile-created-at"></span>
+                                                        <span class="fw-bold text-end" id="profile-created-at">
+                                                            <% if (user.createdAt) { %>
+                                                                <%= new Date(user.createdAt).toLocaleDateString('es-ES') %>
+                                                            <% } else { %>
+                                                                No disponible
+                                                            <% } %>
+                                                        </span>
                                                     </li>
                                                     <li
                                                         class="list-group-item d-flex justify-content-between align-items-center">
                                                         <div><i class="fas fa-cubes fa-fw me-2 text-muted"></i>Modelos
                                                             Permitidos</div>
-                                                        <span class="fw-bold text-end" id="profile-models"></span>
+                                                        <span class="fw-bold text-end" id="profile-models"><%= user.models && user.models.length > 0 ? user.models.join(', ') : 'Todos' %></span>
                                                     </li>
                                                 </ul>
                                             </div>
@@ -460,6 +480,9 @@
                                 </div>
                                 <div class="mb-2">
                                     <strong>Costo:</strong> <span id="modal-cost"></span>
+                                </div>
+                                <div class="mb-2">
+                                    <strong>Número de Archivo:</strong> <span id="modal-file-number"></span>
                                 </div>
                                 <a id="download-link" href="#" download class="btn btn-success mt-2">
                                     <i class="fas fa-download"></i> Descargar

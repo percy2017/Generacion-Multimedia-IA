@@ -1,5 +1,6 @@
 import { loadLLMModels } from './model-handler.js';
 import { loadGallery } from './gallery-handler.js';
+import { initProfileTab } from './profile-handler.js';
 
 // Función para inicializar los event listeners de los tabs
 export function initTabHandlers() {
@@ -10,6 +11,7 @@ export function initTabHandlers() {
       // This event fires when the profile tab is shown
       // We could load additional profile data here if needed
       // La variable global USER_DATA es creada por el servidor en main.ejs
+      initProfileTab();
     });
   }
 

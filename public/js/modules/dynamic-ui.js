@@ -8,13 +8,16 @@ export function populateToolOptions() {
     toolSelector.remove(1);
   }
 
-  if (typeof TOOL_SCHEMAS !== 'undefined') {
+  // Verificar que TOOL_SCHEMAS esté definido y sea un array
+  if (typeof TOOL_SCHEMAS !== 'undefined' && Array.isArray(TOOL_SCHEMAS)) {
     TOOL_SCHEMAS.forEach((tool) => {
       const option = document.createElement("option");
       option.value = tool.id;
       option.textContent = tool.name;
       toolSelector.appendChild(option);
     });
+  } else {
+    console.warn("TOOL_SCHEMAS no está definido o no es un array:", TOOL_SCHEMAS);
   }
 }
 

@@ -35,9 +35,15 @@ export function loadGallery() {
                         <div class="text-center text-muted w-100">
                             <i class="fas fa-exclamation-triangle fa-3x mb-3 text-warning"></i>
                             <p>Error al cargar la galería.</p>
-                            <button class="btn btn-sm btn-outline-primary mt-2" onclick="loadGallery()">Reintentar</button>
+                            <button class="btn btn-sm btn-outline-primary mt-2" id="retry-gallery-btn">Reintentar</button>
                         </div>
                     `;
+        
+        // Add event listener to retry button
+        const retryBtn = document.getElementById("retry-gallery-btn");
+        if (retryBtn) {
+          retryBtn.addEventListener("click", loadGallery);
+        }
       });
   }
 }
@@ -67,9 +73,9 @@ function renderMediaGallery(mediaFiles) {
                             <span class="small">${
                               file.fileNumber || file.name
                             }</span>
-                            <button class="btn btn-sm btn-light" onclick="downloadMedia('${
+                            <button class="btn btn-sm btn-light download-media-btn" data-url="${
                               file.url
-                            }', '${file.name}')">
+                            }" data-filename="${file.name}">
                                 <i class="fas fa-download"></i>
                             </button>
                         </div>
@@ -87,9 +93,9 @@ function renderMediaGallery(mediaFiles) {
                             <span class="small">${
                               file.fileNumber || file.name
                             }</span>
-                            <button class="btn btn-sm btn-light" onclick="downloadMedia('${
+                            <button class="btn btn-sm btn-light download-media-btn" data-url="${
                               file.url
-                            }', '${file.name}')">
+                            }" data-filename="${file.name}">
                                 <i class="fas fa-download"></i>
                             </button>
                         </div>
@@ -108,6 +114,17 @@ function renderMediaGallery(mediaFiles) {
 
     galleryContainer.appendChild(mediaItem);
   });
+  
+  // Add event listeners for download buttons
+  const downloadButtons = galleryContainer.querySelectorAll(".download-media-btn");
+  downloadButtons.forEach(button => {
+    button.addEventListener("click", (e) => {
+      e.stopPropagation(); // Prevent triggering the modal
+      const url = button.getAttribute("data-url");
+      const filename = button.getAttribute("data-filename");
+      downloadMedia(url, filename);
+    });
+  });
 }
 
 // Función para mostrar medios en el modal
@@ -119,6 +136,16 @@ function showMediaInModal(file) {
   const modalDate = document.getElementById("modal-date");
   const modalCost = document.getElementById("modal-cost");
   const downloadLink = document.getElementById("download-link");
+  const copyPromptBtn = document.getElementById("copy-prompt-btn");
+  const modalPublicUrl = document.getElementById("modal-public-url");
+  const copyUrlBtn = document.getElementById("copy-url-btn");
+  const modalFileNumber = document.getElementById("modal-file-number");
+
+  // Check if all required elements exist
+  if (!modalImage || !modalVideo) {
+    console.error("Modal elements not found in DOM");
+    return;
+  }
 
   // Hide both image and video elements
   modalImage.style.display = "none";
@@ -139,14 +166,24 @@ function showMediaInModal(file) {
   }
 
   // Set modal content
-  modalPrompt.textContent = file.prompt || "No prompt disponible";
-  modalModel.textContent = file.toolName || file.keyName || "Desconocido";
-  modalDate.textContent = new Date(file.timestamp).toLocaleString();
-  modalCost.textContent = file.cost ? `${file.cost.toFixed(4)}` : "N/A";
+  if (modalPrompt) modalPrompt.textContent = file.prompt || "No prompt disponible";
+  if (modalModel) modalModel.textContent = file.toolName || "Desconocido";
+  if (modalDate) modalDate.textContent = new Date(file.timestamp).toLocaleString();
+  if (modalCost) modalCost.textContent = file.cost ? `${file.cost.toFixed(4)}` : "N/A";
+  if (modalFileNumber) modalFileNumber.textContent = file.fileNumber || "N/A";
 
   // Set download link
-  downloadLink.href = file.url;
-  downloadLink.download = file.name;
+  if (downloadLink) {
+    downloadLink.href = file.url;
+    downloadLink.download = file.name;
+  }
+
+  // Set public URL
+  if (modalPublicUrl) {
+    // Crear la URL pública completa
+    const publicUrl = `${window.location.origin}${file.url}`;
+    modalPublicUrl.value = publicUrl;
+  }
 
   // Update modal title to include file number
   const modalTitle = document.getElementById("imageDetailModalLabel");
@@ -154,11 +191,47 @@ function showMediaInModal(file) {
     modalTitle.textContent = `Archivo #${file.fileNumber || "N/A"}`;
   }
 
-  // Show modal
-  const modal = new bootstrap.Modal(
-    document.getElementById("imageDetailModal")
-  );
-  modal.show();
+  // Add event listener to copy prompt button
+  if (copyPromptBtn && file.prompt) {
+    copyPromptBtn.onclick = function() {
+      navigator.clipboard.writeText(file.prompt).then(() => {
+        // Show success feedback
+        const originalText = copyPromptBtn.innerHTML;
+        copyPromptBtn.innerHTML = '<i class="fas fa-check"></i> Copiado!';
+        setTimeout(() => {
+          copyPromptBtn.innerHTML = originalText;
+        }, 2000);
+      }).catch(err => {
+        console.error('Error al copiar el prompt: ', err);
+      });
+    };
+  }
+
+  // Add event listener to copy URL button
+  if (copyUrlBtn && modalPublicUrl) {
+    copyUrlBtn.onclick = function() {
+      const url = modalPublicUrl.value;
+      if (url) {
+        navigator.clipboard.writeText(url).then(() => {
+          // Show success feedback
+          const originalText = copyUrlBtn.innerHTML;
+          copyUrlBtn.innerHTML = '<i class="fas fa-check"></i>';
+          setTimeout(() => {
+            copyUrlBtn.innerHTML = originalText;
+          }, 2000);
+        }).catch(err => {
+          console.error('Error al copiar la URL: ', err);
+        });
+      }
+    };
+  }
+
+  // Show modal only if all required elements exist
+  const modalElement = document.getElementById("imageDetailModal");
+  if (modalElement) {
+    const modal = new bootstrap.Modal(modalElement);
+    modal.show();
+  }
 }
 
 // Función para descargar medios

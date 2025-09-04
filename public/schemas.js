@@ -308,7 +308,6 @@ const TOOL_SCHEMAS = [
     name: "Alibaba / Wan 2.1 T2V 720p",
     description: "Wan 2.1 es un modelo de generación de video AI de código abierto que utiliza una arquitectura de transformador de difusión y un VAE espaciotemporal 3D novedoso (Wan-VAE).",
     logo: "/public/img/wan21.svg",
-
     provider: "runpod",
     api_endpoint: "https://api.runpod.ai/v2/wan-2-1-t2v-720/runsync",
     apiKey: "",
